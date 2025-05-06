@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// 预先分配640KB内存池
-#define MEMORY_SIZE 640
-//假设内存块元数据占据1KB
-#define BLOCK_SIZE 1
+// 预先分配60KB内存池
+#define MEMORY_SIZE 60 * 1024
+// 内存块元数据
+#define BLOCK_SIZE sizeof(MemoryBlock) //单位字节
 
 // 内存块元数据（地址，大小，状态）
 typedef struct MemoryBlock {
@@ -24,7 +24,7 @@ MemoryBlock* head = NULL;
 void initialize_memory() {
     head = (MemoryBlock*)memory_pool;
     head->size = MEMORY_SIZE - BLOCK_SIZE;
-    head->start_addr = 0;
+    head->start_addr =0;
     head->is_free = 1;
     head->next = NULL;
 }
@@ -89,6 +89,10 @@ int allocate_memory(size_t size, int algorithm) {
         printf("❌ 错误：分配大小错误 \n");
         return -1;
     }
+    if(size < 8) {
+        size = 8;
+        printf("分配需求过小，按8字节请求");
+    }
     MemoryBlock* target = NULL;  //满足内存大小目标块
     switch (algorithm) {
     case 1:  //首次适应
@@ -115,7 +119,7 @@ int allocate_memory(size_t size, int algorithm) {
     }  
 
     target->is_free = 0;
-    printf("✅成功分配 %zu KB，起始地址：%zu KB \n", size, target->start_addr);
+    printf("✅成功分配 %zu KB，起始地址：%zu KB \n", size, (target->start_addr)/1024);
     return 0;
 }
 
@@ -131,17 +135,17 @@ void free_memory(size_t start_addr) {   //传入目标释放块地址
     }
 
     if (current == NULL) {
-        printf("❌错误：未找到起始地址为 %zu KB 的内存块 \n", start_addr);
+        printf("❌错误：未找到起始地址为 %zu KB 的内存块 \n", start_addr/1024);
         return;
     }
 
     if (current->is_free) {
-        printf("❌错误：起始地址 %zu KB 的内存块已被释放 \n", start_addr);
+        printf("❌错误：起始地址 %zu KB 的内存块已被释放 \n", start_addr/1024);
         return;
     }
 
     current->is_free = 1;
-    printf("✅已释放起始地址 %zu KB 的内存块（大小：%zu KB）。\n", current->start_addr, current->size);
+    printf("✅已释放起始地址 %zu KB 的内存块（大小：%zu KB）。\n", (current->start_addr)/1024, (current->size)/1024);
 
 
     // 合并前驱空闲块
@@ -180,11 +184,11 @@ void print_stats() {
     }
 
     printf("\n内存统计：\n");
-    printf("✅ 空闲内存（用户可用）: %zu KB\n", total_free);
-    printf("🟥 已用内存（用户数据）: %zu KB\n", total_used);
-    printf("📊 元数据占用: %zu KB\n", total_metadata);
-    printf("🔍 总可用内存（用户）: %zu KB\n", total_available);
-    printf("💾 内存池总大小: %u KB\n", MEMORY_SIZE);
+    printf("✅ 空闲内存（用户可用）: %zu KB\n", total_free/1024);
+    printf("🟥 已用内存（用户数据）: %zu KB\n", total_used/1024);
+    printf("📊 元数据占用: %zu 字节\n", total_metadata);
+    printf("🔍 总可用内存（用户）: %zu KB\n", total_available/1024);
+    printf("💾 内存池总大小: %u KB\n", MEMORY_SIZE/1024);
 }
 
 //内存分区情况 可视化
@@ -196,17 +200,17 @@ void display_memory() {
     printf("地址\t大小\t状态\t图形表示\n");
     current = head;
     while (current) {
-        printf("%zu\t%zu\t", current->start_addr, current->size);
+        printf("%zuKB\t%zu\t", (current->start_addr)/1024, (current->size)/1024);
         printf("%s\t", current->is_free ? "空闲" : "已分配");
         
-        int display_length = current->size / 10;
+        int display_length = current->size / 8;
         if (display_length > 20) display_length = 20;
         if (display_length < 1) display_length = 1;
         
         for (int i = 0; i < display_length; i++) {
             printf(current->is_free ? "🟩" : "🟥");
         }
-        printf(" (%zuKB)\n", current->size);
+        printf(" (%zuKB)\n", (current->size)/1024);
         current = current->next;
     }
     printf("\n");
@@ -232,13 +236,13 @@ int main() {
             size_t size;
             printf("请输入要分配的内存大小（KB）：");
             scanf("%zu", &size);
-            allocate_memory(size, algorithm);
+            allocate_memory(size*1024, algorithm);
             display_memory();
         } else if(choice == 2) {
             size_t addr;
             printf("请输入要释放的内存块起始地址（KB）：");
             scanf("%zu", &addr);
-            free_memory(addr);
+            free_memory(addr*1024);
             display_memory();
         } else if(choice == 3) {
             display_memory();
