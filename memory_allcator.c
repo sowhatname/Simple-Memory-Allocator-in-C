@@ -3,13 +3,15 @@
 
 // 预先分配640KB内存池
 #define MEMORY_SIZE 640
+//假设内存块元数据占据1KB
+#define BLOCK_SIZE 1
 
 // 内存块元数据（地址，大小，状态）
 typedef struct MemoryBlock {
     size_t start_addr;          //起始地址
-    size_t size;                //无符号整数类型 表示对象大小
+    size_t size;                //无符号整数类型 数据区大小（字节）
     int is_free;                //1为空闲 0为已分配
-    struct MemoryBlock *next;   //后继
+    struct MemoryBlock *next;   //后继节点
 } MemoryBlock;
 
 // 静态内存池
@@ -21,7 +23,7 @@ MemoryBlock* head = NULL;
 //初始化内存链表  640KB的空闲块
 void initialize_memory() {
     head = (MemoryBlock*)memory_pool;
-    head->size = MEMORY_SIZE - sizeof(MemoryBlock);
+    head->size = MEMORY_SIZE - BLOCK_SIZE;
     head->start_addr = 0;
     head->is_free = 1;
     head->next = NULL;
@@ -31,7 +33,7 @@ void initialize_memory() {
 MemoryBlock* allocate_first_fit(size_t size) {
     MemoryBlock* current = head;
     while(current) {
-        if (current->is_free && current->size >= size + sizeof(MemoryBlock)) {
+        if (current->is_free && current->size >= size + BLOCK_SIZE) {
             current->is_free = 0;
             return current;
         }
@@ -45,7 +47,7 @@ MemoryBlock* allocate_best_fit(size_t size) {
     MemoryBlock* current = head;
     MemoryBlock* best = NULL;
     while(current) {
-        if(current->is_free && current->size >= size + sizeof(MemoryBlock)) {
+        if(current->is_free && current->size >= size + BLOCK_SIZE) {
             if(best == NULL || current->size < best->size)
                 best = current;
         }
@@ -59,7 +61,7 @@ MemoryBlock* allocate_worst_fit(size_t size) {
     MemoryBlock* current = head;
     MemoryBlock* worst = NULL;
     while(current) {
-        if(current->is_free && current->size >= size + sizeof(MemoryBlock)) {
+        if(current->is_free && current->size >= size + BLOCK_SIZE) {
             if(worst == NULL || current->size > worst->size)
                 worst = current;
         }
@@ -71,10 +73,10 @@ MemoryBlock* allocate_worst_fit(size_t size) {
 //分割空闲块
 void split_MemoryBlock(MemoryBlock* target, size_t size) {
     
-    MemoryBlock* new_block = (MemoryBlock*)((char*)target + sizeof(MemoryBlock) + size);
+    MemoryBlock* new_block = (MemoryBlock*)((char*)target + BLOCK_SIZE + size);
 
     new_block->start_addr = target->start_addr + size;
-    new_block->size = target->size - size - sizeof(MemoryBlock);
+    new_block->size = target->size - size - BLOCK_SIZE;
     new_block->is_free = 1;
     new_block->next = target->next;
     target->next = new_block;
@@ -87,7 +89,6 @@ int allocate_memory(size_t size, int algorithm) {
         printf("❌ 错误：分配大小错误 \n");
         return -1;
     }
-
     MemoryBlock* target = NULL;  //满足内存大小目标块
     switch (algorithm) {
     case 1:  //首次适应
@@ -109,8 +110,9 @@ int allocate_memory(size_t size, int algorithm) {
         return -1;
     }
 
-    if(target->size - size - sizeof(MemoryBlock) > sizeof(MemoryBlock))   
+    if(target->size - size - BLOCK_SIZE > BLOCK_SIZE) {
         split_MemoryBlock(target, size);
+    }  
 
     target->is_free = 0;
     printf("✅成功分配 %zu KB，起始地址：%zu KB \n", size, target->start_addr);
@@ -144,7 +146,7 @@ void free_memory(size_t start_addr) {   //传入目标释放块地址
 
     // 合并前驱空闲块
     if (prev && prev->is_free) {
-        prev->size += current->size;
+        prev->size = prev->size + current->size + BLOCK_SIZE;
         prev->next = current->next;
         current = prev;  // 让 current 指向合并后的块
     }
@@ -152,7 +154,7 @@ void free_memory(size_t start_addr) {   //传入目标释放块地址
     // 合并后继空闲块
     MemoryBlock *next_block = current->next;
     if (next_block && next_block->is_free) {
-        current->size += next_block->size;
+        current->size = current->size + next_block->size + BLOCK_SIZE;
         current->next = next_block->next;
     }
 
@@ -172,7 +174,7 @@ void print_stats() {
         } else {
             total_used += current->size;  // 用户已分配的部分
         }
-        total_metadata += sizeof(MemoryBlock);  // 每个块都有元数据
+        total_metadata += BLOCK_SIZE;  // 每个块都有元数据
         total_available += current->size;       // 用户可用的总内存（不含元数据）
         current = current->next;
     }
@@ -182,7 +184,7 @@ void print_stats() {
     printf("🟥 已用内存（用户数据）: %zu KB\n", total_used);
     printf("📊 元数据占用: %zu KB\n", total_metadata);
     printf("🔍 总可用内存（用户）: %zu KB\n", total_available);
-    printf("💾 内存池总大小: %zu KB\n", MEMORY_SIZE);
+    printf("💾 内存池总大小: %u KB\n", MEMORY_SIZE);
 }
 
 //内存分区情况 可视化
